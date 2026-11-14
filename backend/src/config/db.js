@@ -2,7 +2,9 @@ const mongoose = require('mongoose');
 
 const connectDB = async () => {
   try {
-    const conn = await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/taskflow');
+    const conn = await mongoose.connect(
+      process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/taskflow'
+    );
     console.log(`[MongoDB] Connected successfully to: ${conn.connection.host}`);
     return conn;
   } catch (error) {
