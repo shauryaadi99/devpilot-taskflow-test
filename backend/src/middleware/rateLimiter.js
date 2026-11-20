@@ -1,31 +1,34 @@
-const rateLimit = require('express-rate-limit');
+/**
+ * Simple in‑memory rate limiter middleware.
+ * Limits each IP to a maximum number of requests within a time window.
+ */
+const WINDOW_MS = 15 * 60 * 1000; // 15 minutes
+const MAX_REQUESTS = 5; // max requests per window per IP
 
-let store;
-// Attempt to use Redis for a distributed store if REDIS_URL is provided
-if (process.env.REDIS_URL) {
-  try {
-    const { createClient } = require('redis');
-    const RedisStore = require('rate-limit-redis');
-    const redisClient = createClient({ url: process.env.REDIS_URL });
-    // Connect in background; errors will be logged but not crash the app
-    redisClient.connect().catch((err) => console.error('Redis connection error:', err));
-    store = new RedisStore({
-      sendCommand: (...args) => redisClient.sendCommand(args),
-    });
-  } catch (e) {
-    console.warn('Redis store unavailable, falling back to in‑memory rate limiter');
-    store = undefined; // express-rate-limit will use default MemoryStore
+// Map to track request count and window start per IP
+const ipRecords = new Map();
+
+function rateLimiter(req, res, next) {
+  const ip = req.ip || req.headers['x-forwarded-for'] || req.connection.remoteAddress;
+  const now = Date.now();
+
+  const record = ipRecords.get(ip) || { count: 0, start: now };
+
+  // Reset count if window has passed
+  if (now - record.start > WINDOW_MS) {
+    record.count = 1;
+    record.start = now;
+  } else {
+    record.count += 1;
   }
+
+  ipRecords.set(ip, record);
+
+  if (record.count > MAX_REQUESTS) {
+    return res.status(429).json({ message: 'Too many requests, please try again later.' });
+  }
+
+  next();
 }
 
-// Configure rate limiting: max 5 requests per 15 minutes per IP
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5,
-  message: { message: 'Too many requests, please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-  store,
-});
-
-module.exports = limiter;
+module.exports = rateLimiter;
