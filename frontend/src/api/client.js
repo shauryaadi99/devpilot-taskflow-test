@@ -41,7 +41,7 @@ export const authAPI = {
   login: (credentials) => api.post('/auth/login', credentials),
   getMe: () => api.get('/auth/me'),
   requestPasswordReset: (email) => api.post('/auth/forgot-password', { email }),
-  resetPassword: (token, password) => api.post('/auth/reset-password', { token, password })
+  resetPassword: (token, password) => api.post(`/auth/reset-password/${token}`, { password })
 };
 
 // Task endpoints

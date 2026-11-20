@@ -9,7 +9,7 @@ router.post('/login', loginUser);
 router.get('/me', protect, getMe);
 // Rate‑limited endpoint for initiating password reset
 router.post('/forgot-password', rateLimiter, forgotPassword);
-// Endpoint for completing password reset using token
-router.post('/reset-password', resetPassword);
+// Rate‑limited endpoint for completing password reset using token
+router.post('/reset-password/:token', rateLimiter, resetPassword);
 
 module.exports = router;

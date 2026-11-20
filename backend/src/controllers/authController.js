@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 const User = require('../models/User');
 const PasswordResetToken = require('../models/PasswordResetToken');
 
@@ -136,7 +137,7 @@ const getMe = async (req, res, next) => {
   }
 };
 
-// @desc    Initiate password reset (generate token and log URL)
+// @desc    Initiate password reset (generate token, send email)
 // @route   POST /api/auth/forgot-password
 // @access  Public
 const forgotPassword = async (req, res, next) => {
@@ -170,9 +171,31 @@ const forgotPassword = async (req, res, next) => {
       expiresAt
     });
 
-    // Construct reset URL (for demo we log it)
-    const resetUrl = `${req.protocol}://${req.get('host')}/api/auth/reset-password/${resetToken}`;
-    console.log('Password reset URL:', resetUrl);
+    // Construct reset URL
+    const resetUrl = `${req.protocol}://${req.get('host')}/reset-password?token=${resetToken}`;
+
+    // Send email using nodemailer (fallback to console.log if not configured)
+    try {
+      const transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST,
+        port: process.env.SMTP_PORT,
+        secure: false,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS
+        }
+      });
+
+      await transporter.sendMail({
+        from: process.env.EMAIL_FROM || 'no-reply@taskflow.com',
+        to: user.email,
+        subject: 'TaskFlow Password Reset',
+        text: `You requested a password reset. Click the link to reset your password: ${resetUrl}`,
+        html: `<p>You requested a password reset.</p><p>Click <a href="${resetUrl}">here</a> to reset your password.</p>`
+      });
+    } catch (emailErr) {
+      console.log('Password reset URL (email not configured):', resetUrl);
+    }
 
     res.status(200).json({
       success: true,
@@ -188,7 +211,8 @@ const forgotPassword = async (req, res, next) => {
 // @access  Public
 const resetPassword = async (req, res, next) => {
   try {
-    const { token } = req.params;
+    // Support token from URL param or request body for flexibility
+    const token = req.params.token || req.body.token;
     const { password } = req.body;
 
     if (!token || !password) {

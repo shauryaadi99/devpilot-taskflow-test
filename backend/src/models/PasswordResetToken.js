@@ -23,4 +23,7 @@ const PasswordResetTokenSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// TTL index to automatically delete expired tokens
+PasswordResetTokenSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+
 module.exports = mongoose.model('PasswordResetToken', PasswordResetTokenSchema);
