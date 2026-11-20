@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const User = require('../models/User');
+const PasswordResetToken = require('../models/PasswordResetToken');
 
 // Helper function to sign JWT
 const generateToken = (id) => {
@@ -134,9 +136,118 @@ const getMe = async (req, res, next) => {
   }
 };
 
+// @desc    Initiate password reset (generate token and log URL)
+// @route   POST /api/auth/forgot-password
+// @access  Public
+const forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide an email address'
+      });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!user) {
+      // Respond with success to avoid email enumeration
+      return res.status(200).json({
+        success: true,
+        message: 'If that email is registered, a reset link has been sent.'
+      });
+    }
+
+    // Generate a secure random token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const tokenHash = crypto.createHash('sha256').update(resetToken).digest('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    // Save token document
+    await PasswordResetToken.create({
+      userId: user._id,
+      tokenHash,
+      expiresAt
+    });
+
+    // Construct reset URL (for demo we log it)
+    const resetUrl = `${req.protocol}://${req.get('host')}/api/auth/reset-password/${resetToken}`;
+    console.log('Password reset URL:', resetUrl);
+
+    res.status(200).json({
+      success: true,
+      message: 'If that email is registered, a reset link has been sent.'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reset password using token
+// @route   POST /api/auth/reset-password/:token
+// @access  Public
+const resetPassword = async (req, res, next) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    if (!token || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token and new password are required'
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 6 characters long'
+      });
+    }
+
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const resetRecord = await PasswordResetToken.findOne({
+      tokenHash,
+      expiresAt: { $gt: new Date() },
+      used: false
+    });
+
+    if (!resetRecord) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired token'
+      });
+    }
+
+    // Find user and update password
+    const user = await User.findById(resetRecord.userId).select('+password');
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'User not found'
+      });
+    }
+
+    user.password = password; // pre‑save hook will hash it
+    await user.save();
+
+    // Mark token as used
+    resetRecord.used = true;
+    await resetRecord.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Password has been reset successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
-  getMe
+  getMe,
+  forgotPassword,
+  resetPassword
 };
-
