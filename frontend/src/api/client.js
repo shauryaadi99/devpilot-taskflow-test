@@ -39,7 +39,9 @@ api.interceptors.response.use(
 export const authAPI = {
   register: (userData) => api.post('/auth/register', userData),
   login: (credentials) => api.post('/auth/login', credentials),
-  getMe: () => api.get('/auth/me')
+  getMe: () => api.get('/auth/me'),
+  requestPasswordReset: (email) => api.post('/auth/forgot-password', { email }),
+  resetPassword: (token, password) => api.post(`/auth/reset-password/${token}`, { password })
 };
 
 // Task endpoints
@@ -53,4 +55,3 @@ export const taskAPI = {
 };
 
 export default api;
-

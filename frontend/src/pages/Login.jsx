@@ -120,6 +120,12 @@ const Login = () => {
                 <span>Sign In</span>
               )}
             </button>
+
+            <div className="mt-4 text-center text-xs text-slate-500">
+              <Link to="/forgot-password" className="font-semibold text-indigo-600 hover:text-indigo-700 hover:underline">
+                Forgot password?
+              </Link>
+            </div>
           </form>
 
           <div className="mt-6 text-center text-xs text-slate-500">
@@ -138,4 +144,3 @@ const Login = () => {
 };
 
 export default Login;
-
